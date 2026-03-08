@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  LIVREUR
+  ADMIN
+}
+
+enum Operator {
+  ORANGE_MONEY
+  WAVE
+}
+
+enum TransactionStatus {
+  INITIATED
+  FUNDS_HELD
+  QR_GENERATED
+  DELIVERED
+  COMPLETED
+  REFUNDED
+  DISPUTED
+}
+
+enum DeliveryStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DeliveryRequestStatus {
+  PENDING
+  ACCEPTED
+  REFUSED
+  CANCELLED
+}
+
+enum DisputeStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED_RELEASE
+  RESOLVED_REFUND
+}
+
+enum MobileMoneyLogType {
+  DEPOSIT_RECEIVED
+  RELEASE_SENT
+  REFUND_SENT
+  COMMISSION_RETAINED
+}
+
+enum MobileMoneyLogStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+enum NotificationType {
+  PAYMENT
+  INFO
+  ALERT
+  DELIVERY
+  DISPUTE
+}
+
+model User {
+  id          String   @id @default(uuid())
+  nom         String
+  prenom      String
+  email       String   @unique
+  telephone   String   @unique
+  password    String
+  role        Role     @default(CLIENT)
+  isVerified  Boolean  @default(false)
+  fcmToken    String?
+  otpCode     String?
+  otpExpiry   DateTime?
+  rating      Float    @default(0)
+  ratingCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactionsSent      Transaction[]        @relation("Sender")
+  transactionsReceived  Transaction[]        @relation("Receiver")
+  deliveries            Delivery[]           @relation("Livreur")
+  deliveryRequests      DeliveryRequest[]    @relation("Vendeur")
+  deliveriesAccepted    DeliveryRequest[]    @relation("LivreurAccepted")
+  disputesOpened        Dispute[]            @relation("OpenedBy")
+  disputesResolved      Dispute[]            @relation("ResolvedBy")
+  qrCodesScanned        QRCode[]             @relation("ScannedByBuyer")
+  notifications         Notification[]
+
+  @@index([email])
+  @@index([telephone])
+  @@index([role])
+}
+
+model Transaction {
+  id          String            @id @default(uuid())
+  montant     Float
+  commission  Float
+  montantNet  Float
+  operator    Operator
+  status      TransactionStatus @default(INITIATED)
+  description String?
+  omRef       String?
+  waveRef     String?
+  senderId    String
+  sender      User              @relation("Sender", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User              @relation("Receiver", fields: [receiverId], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  qrCode          QRCode?
+  delivery        Delivery?
+  deliveryRequest DeliveryRequest?
+  dispute         Dispute?
+  mobileMoneyLogs MobileMoneyLog[]
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model QRCode {
+  id               String    @id @default(uuid())
+  token            String    @unique
+  isUsed           Boolean   @default(false)
+  expiresAt        DateTime
+  scannedAt        DateTime?
+  scannedByBuyerId String?
+  scannedByBuyer   User?     @relation("ScannedByBuyer", fields: [scannedByBuyerId], references: [id])
+  transactionId    String    @unique
+  transaction      Transaction @relation(fields: [transactionId], references: [id])
+  createdAt        DateTime  @default(now())
+
+  @@index([token])
+  @@index([transactionId])
+  @@index([expiresAt])
+}
+
+model Delivery {
+  id               String         @id @default(uuid())
+  adresseLivraison String
+  status           DeliveryStatus @default(PENDING)
+  requestedAt      DateTime       @default(now())
+  completedAt      DateTime?
+  transactionId    String         @unique
+  transaction      Transaction    @relation(fields: [transactionId], references: [id])
+  livreurId        String
+  livreur          User           @relation("Livreur", fields: [livreurId], references: [id])
+  createdAt        DateTime       @default(now())
+
+  @@index([livreurId])
+  @@index([status])
+}
+
+model DeliveryRequest {
+  id               String                @id @default(uuid())
+  adresseCollecte  String
+  adresseLivraison String
+  instructions     String?
+  status           DeliveryRequestStatus @default(PENDING)
+  notifiedAt       DateTime?
+  transactionId    String                @unique
+  transaction      Transaction           @relation(fields: [transactionId], references: [id])
+  vendeurId        String
+  vendeur          User                  @relation("Vendeur", fields: [vendeurId], references: [id])
+  livreurId        String?
+  livreur          User?                 @relation("LivreurAccepted", fields: [livreurId], references: [id])
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([vendeurId])
+  @@index([livreurId])
+  @@index([status])
+}
+
+model Dispute {
+  id            String        @id @default(uuid())
+  description   String
+  preuves       String[]
+  status        DisputeStatus @default(OPEN)
+  decision      String?
+  resolvedAt    DateTime?
+  transactionId String        @unique
+  transaction   Transaction   @relation(fields: [transactionId], references: [id])
+  openedById    String
+  openedBy      User          @relation("OpenedBy", fields: [openedById], references: [id])
+  resolvedById  String?
+  resolvedBy    User?         @relation("ResolvedBy", fields: [resolvedById], references: [id])
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status])
+  @@index([transactionId])
+}
+
+model MobileMoneyLog {
+  id            String               @id @default(uuid())
+  type          MobileMoneyLogType
+  operator      Operator
+  amount        Float
+  status        MobileMoneyLogStatus @default(PENDING)
+  rawPayload    Json?
+  transactionId String
+  transaction   Transaction          @relation(fields: [transactionId], references: [id])
+  createdAt     DateTime             @default(now())
+
+  @@index([transactionId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  titre     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}

@@ -1,0 +1,43 @@
+# Dépendances
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
+/dist
+/build
+
+# Environnement — NE JAMAIS COMMIT CES FICHIERS
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Prisma — garder les migrations, pas les binaires
+prisma/migrations/*/migration_lock.toml
+
+# Logs
+logs/
+*.log
+
+# Éditeurs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+/coverage
+/test-results
+
+# Misc
+*.tsbuildinfo
