@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { DatabaseModule } from './database/database.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 
 // Configs
 import appConfig from './config/app.config';
@@ -40,9 +41,9 @@ import storageConfig from './config/storage.config';
     }),
 
     // ─── Modules métier ──────────────────────────────────
-    NotificationsModule,  // ✅ Prompt 1-6 — Global, disponible partout
+    NotificationsModule,  // ✅ Prompt 1-6 — Global
     AuthModule,           // ✅ Prompt 1-5
-    // UsersModule        // 🔜 Prompt 1-7
+    UsersModule,          // ✅ Prompt 1-7
     // MobileMoneyModule  // 🔜 DEV 2
     // TransactionsModule // 🔜 DEV 2
     // QRCodeModule       // 🔜 DEV 3

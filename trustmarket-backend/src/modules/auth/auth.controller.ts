@@ -68,7 +68,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtRefreshGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Renouvellement des tokens JWT avec le refresh token' })
   @ApiResponse({ status: 200, description: 'Nouveaux tokens retournés' })
   async refresh(
@@ -81,7 +81,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Déconnexion' })
   @ApiResponse({ status: 200, description: 'Déconnexion réussie' })
   async logout(@CurrentUser() user: { userId: string }) {
