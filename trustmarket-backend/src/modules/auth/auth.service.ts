@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
+import { EmailService } from '../notifications/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -22,13 +23,13 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private emailService: EmailService, // ✅ Ajouté — Prompt 1-6
   ) {}
 
   // ─────────────────────────────────────────
   // INSCRIPTION
   // ─────────────────────────────────────────
   async register(dto: RegisterDto) {
-    // 1. Valide le numéro de téléphone burkinabè
     if (!isValidBurkinaPhone(dto.telephone)) {
       throw new BadRequestException(
         'Numéro de téléphone invalide. Utilisez un numéro burkinabè valide (ex: 07XXXXXXXX)',
@@ -37,7 +38,6 @@ export class AuthService {
 
     const telephoneFormate = formatPhone(dto.telephone);
 
-    // 2. Vérifie que l'email et le téléphone ne sont pas déjà utilisés
     const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [{ email: dto.email }, { telephone: telephoneFormate }],
@@ -51,14 +51,10 @@ export class AuthService {
       throw new ConflictException('Ce numéro de téléphone est déjà utilisé');
     }
 
-    // 3. Hash du mot de passe
     const hashedPassword = await bcrypt.hash(dto.password, 12);
-
-    // 4. Génération de l'OTP
     const otpCode = generateOTP();
     const otpExpiry = getOTPExpiry();
 
-    // 5. Création de l'utilisateur (non vérifié)
     const user = await this.prisma.user.create({
       data: {
         nom: dto.nom,
@@ -73,16 +69,12 @@ export class AuthService {
       },
     });
 
-    // TODO Prompt 1-6 : Envoyer l'OTP par email via EmailService
-    // await this.emailService.sendOtp(user.email, user.prenom, otpCode);
-
-    // En développement, on retourne l'OTP dans la réponse
-    const isDev = this.configService.get('app.nodeEnv') === 'development';
+    // ✅ Envoi du vrai email OTP via Resend
+    await this.emailService.sendOtp(user.email, user.prenom, otpCode);
 
     return {
       message: 'Inscription réussie. Vérifiez votre email pour le code OTP.',
       email: user.email,
-      ...(isDev && { otpCode }), // Seulement en développement !
     };
   }
 
@@ -106,17 +98,14 @@ export class AuthService {
       throw new BadRequestException('Aucun OTP en attente. Faites une nouvelle demande.');
     }
 
-    // Vérifie que l'OTP n'est pas expiré
     if (isOTPExpired(user.otpExpiry)) {
       throw new BadRequestException('Code OTP expiré. Demandez un nouveau code.');
     }
 
-    // Vérifie que le code est correct
     if (user.otpCode !== dto.code) {
       throw new UnauthorizedException('Code OTP incorrect');
     }
 
-    // Active le compte
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -126,7 +115,6 @@ export class AuthService {
       },
     });
 
-    // Génère les tokens JWT directement après vérification
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
     return {
@@ -167,14 +155,11 @@ export class AuthService {
       data: { otpCode, otpExpiry },
     });
 
-    // TODO Prompt 1-6 : Envoyer l'OTP par email
-    // await this.emailService.sendOtp(user.email, user.prenom, otpCode);
-
-    const isDev = this.configService.get('app.nodeEnv') === 'development';
+    // ✅ Envoi du vrai email OTP
+    await this.emailService.sendOtp(user.email, user.prenom, otpCode);
 
     return {
       message: 'Nouveau code OTP envoyé par email.',
-      ...(isDev && { otpCode }),
     };
   }
 
@@ -182,7 +167,6 @@ export class AuthService {
   // CONNEXION
   // ─────────────────────────────────────────
   async login(dto: LoginDto) {
-    // Cherche par email OU par téléphone
     const telephone = isValidBurkinaPhone(dto.emailOrPhone)
       ? formatPhone(dto.emailOrPhone)
       : null;
@@ -206,7 +190,6 @@ export class AuthService {
       );
     }
 
-    // Vérifie le mot de passe
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
     if (!passwordMatch) {
       throw new UnauthorizedException('Email/téléphone ou mot de passe incorrect');
@@ -250,8 +233,6 @@ export class AuthService {
   // DÉCONNEXION
   // ─────────────────────────────────────────
   async logout(userId: string) {
-    // Avec JWT stateless, la déconnexion se fait côté client
-    // Pour une sécurité renforcée, on pourrait blacklister le token dans Redis
     return { message: 'Déconnexion réussie' };
   }
 
