@@ -15,6 +15,7 @@ import commissionConfig from './config/commission.config';
 import mobileMoneyConfig from './config/mobile-money.config';
 import mailerConfig from './config/mailer.config';
 import storageConfig from './config/storage.config';
+import firebaseConfig from './config/firebase.config';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import storageConfig from './config/storage.config';
         mobileMoneyConfig,
         mailerConfig,
         storageConfig,
+        firebaseConfig, // ✅ Ajouté Prompt 1-8
       ],
     }),
     DatabaseModule,
@@ -41,7 +43,7 @@ import storageConfig from './config/storage.config';
     }),
 
     // ─── Modules métier ──────────────────────────────────
-    NotificationsModule,  // ✅ Prompt 1-6 — Global
+    NotificationsModule,  // ✅ Prompt 1-6 & 1-8 — Global
     AuthModule,           // ✅ Prompt 1-5
     UsersModule,          // ✅ Prompt 1-7
     // MobileMoneyModule  // 🔜 DEV 2
